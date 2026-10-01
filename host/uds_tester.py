@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import struct
 import sys
 
 import can
@@ -23,16 +24,33 @@ from udsoncan.connections import PythonIsoTpConnection
 
 import ecu_common as ecu
 
+class ScalarCodec(udsoncan.DidCodec):
+    """One big-endian integer per DID. udsoncan's plain struct-format codecs
+    decode to a 1-tuple; this returns the number itself."""
+
+    def __init__(self, fmt: str):
+        self.fmt = fmt
+
+    def encode(self, value) -> bytes:
+        return struct.pack(self.fmt, value)
+
+    def decode(self, payload: bytes):
+        return struct.unpack(self.fmt, payload)[0]
+
+    def __len__(self) -> int:
+        return struct.calcsize(self.fmt)
+
+
 DID_CODECS = {
-    ecu.DID_ACTIVE_SESSION: "B",
+    ecu.DID_ACTIVE_SESSION: ScalarCodec("B"),
     ecu.DID_FW_VERSION: udsoncan.AsciiCodec(5),
     ecu.DID_SERIAL_NUMBER: udsoncan.AsciiCodec(14),
-    ecu.DID_TEMPERATURE: ">h",
-    ecu.DID_VIBRATION: ">H",
-    ecu.DID_STATUS_FLAGS: "B",
-    ecu.DID_SAMPLE_PERIOD: ">H",
-    ecu.DID_ALARM_THRESHOLD: ">h",
-    ecu.DID_UPTIME: ">I",
+    ecu.DID_TEMPERATURE: ScalarCodec(">h"),
+    ecu.DID_VIBRATION: ScalarCodec(">H"),
+    ecu.DID_STATUS_FLAGS: ScalarCodec("B"),
+    ecu.DID_SAMPLE_PERIOD: ScalarCodec(">H"),
+    ecu.DID_ALARM_THRESHOLD: ScalarCodec(">h"),
+    ecu.DID_UPTIME: ScalarCodec(">I"),
 }
 
 
