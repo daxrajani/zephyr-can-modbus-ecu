@@ -1,0 +1,20 @@
+:name: Sensor ECU bridged to host SocketCAN
+:description: The STM32F4 ECU binary on a CANHub that is bridged to the host's vcan0, so candump, the UDS tester and the integration tests work against the ARM binary unchanged
+
+$ecu_bin ?= @build/stm32/zephyr/zephyr.elf
+
+include $ORIGIN/STMCAN_Zephyr.cs
+
+emulation CreateCANHub "canHub"
+
+mach create "ecu"
+machine LoadPlatformDescription @platforms/boards/stm32f4_discovery-kit.repl
+machine UnregisterFromParent sysbus.can2
+machine UnregisterFromParent sysbus.can1
+machine LoadPlatformDescription $ORIGIN/stm32f4_bxcan_zephyr.repl
+sysbus LoadELF $ecu_bin
+connector Connect sysbus.can1 canHub
+
+# Host side: frames from vcan0 enter the hub and vice versa
+machine CreateSocketCANBridge "socketcan" "vcan0"
+connector Connect socketcan canHub

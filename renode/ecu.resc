@@ -1,0 +1,31 @@
+:name: Sensor ECU two-node CAN bench
+:description: Zephyr sensor ECU and a peer node, both STM32F4 Discovery, on one CANHub
+
+# Override before including: $ecu_bin=@/abs/path/zephyr.elf
+$ecu_bin ?= @build/stm32/zephyr/zephyr.elf
+$peer_bin ?= @build/peer/zephyr/zephyr.elf
+
+# Corrected bxCAN model, compiled by Renode at load time
+include $ORIGIN/STMCAN_Zephyr.cs
+
+macro load_board
+"""
+    machine LoadPlatformDescription @platforms/boards/stm32f4_discovery-kit.repl
+    machine UnregisterFromParent sysbus.can2
+    machine UnregisterFromParent sysbus.can1
+    machine LoadPlatformDescription $ORIGIN/stm32f4_bxcan_zephyr.repl
+"""
+
+emulation CreateCANHub "canHub"
+
+mach create "ecu"
+runMacro $load_board
+sysbus LoadELF $ecu_bin
+connector Connect sysbus.can1 canHub
+
+mach create "peer"
+runMacro $load_board
+sysbus LoadELF $peer_bin
+connector Connect sysbus.can1 canHub
+
+mach clear

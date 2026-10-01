@@ -1,0 +1,10 @@
+// bxCAN controllers for the STM32F4 Discovery, using STMCAN_Zephyr (see
+// STMCAN_Zephyr.cs for the model fixes). Loaded by ecu.resc on top of the
+// stock board after its own can1/can2 have been unregistered.
+
+can1: CAN.STMCAN_Zephyr @ sysbus <0x40006400, +0x400>
+    [0-3] -> nvic@[19-22]
+
+can2: CAN.STMCAN_Zephyr @ sysbus <0x40006800, +0x400>
+    [0-3] -> nvic@[63-66]
+    master: can1
