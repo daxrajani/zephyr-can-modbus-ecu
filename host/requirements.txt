@@ -1,0 +1,7 @@
+python-can>=4.4
+cantools>=39
+can-isotp>=2.0
+udsoncan>=1.23
+pymodbus>=3.10
+pyserial>=3.5
+pytest>=8
