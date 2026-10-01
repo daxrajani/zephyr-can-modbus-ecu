@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  APP: zephyr-can-modbus-ecu
+  RENODE_VERSION: 1.16.1
+
+jobs:
+  build-and-test:
+    name: Build, unit, integration and Renode tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          path: ${{ env.APP }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Zephyr workspace and SDK
+        uses: zephyrproject-rtos/action-zephyr-setup@v1
+        with:
+          app-path: ${{ env.APP }}
+          toolchains: arm-zephyr-eabi
+
+      # ---------------------------------------------------------------- build
+      - name: Build ECU for native_sim
+        run: west build -b native_sim/native/64 $APP/app -d $APP/build/native
+
+      - name: Build ECU for STM32F4 Discovery
+        run: west build -b stm32f4_disco $APP/app -d $APP/build/stm32
+
+      - name: Build peer node for STM32F4 Discovery
+        run: west build -b stm32f4_disco $APP/peer -d $APP/build/peer
+
+      # ----------------------------------------------------------- unit tests
+      - name: Unit tests (Ztest via twister)
+        run: west twister -T $APP/tests/unit -p native_sim/native/64 -O twister-out --inline-logs
+
+      # ---------------------------------------------------- integration setup
+      - name: Set up vcan0
+        run: |
+          sudo apt-get install -y can-utils linux-modules-extra-$(uname -r)
+          $APP/scripts/setup_vcan.sh vcan0
+
+      - name: Install host tools
+        run: pip install -r $APP/host/requirements.txt
+
+      - name: Download Renode ${{ env.RENODE_VERSION }}
+        run: |
+          wget -q https://github.com/renode/renode/releases/download/v${RENODE_VERSION}/renode-${RENODE_VERSION}.linux-portable-dotnet.tar.gz
+          mkdir renode
+          tar xf renode-${RENODE_VERSION}.linux-portable-dotnet.tar.gz -C renode --strip-components=1
+          pip install -r renode/tests/requirements.txt
+          echo "RENODE=$PWD/renode/renode" >> "$GITHUB_ENV"
+
+      # ---------------------------------------------------- integration tests
+      - name: Integration tests (pytest on vcan0, native_sim and Renode bridge)
+        run: |
+          candump -L vcan0 > candump.log &
+          CANDUMP=$!
+          set +e
+          python -m pytest $APP/tests/integration -v --junitxml=pytest-results.xml
+          rc=$?
+          kill $CANDUMP
+          exit $rc
+
+      # ------------------------------------------------- emulated target tests
+      - name: Emulated target tests (Robot Framework on Renode)
+        run: renode/renode-test $APP/renode/ecu.robot
+
+      # --------------------------------------------------------------- report
+      - name: Test summary
+        if: always()
+        run: |
+          {
+            echo "## Measurements"
+            echo '```json'
+            cat $APP/tests/integration/results/metrics.json 2>/dev/null || echo "{}"
+            echo '```'
+            echo "## Unit tests"
+            grep -o 'tests="[0-9]*" failures="[0-9]*" errors="[0-9]*" skipped="[0-9]*"' twister-out/twister.xml | head -1 || true
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload logs and captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            twister-out/twister.xml
+            twister-out/twister.json
+            pytest-results.xml
+            candump.log
+            ${{ env.APP }}/tests/integration/results/
+            robot_output.xml
+            log.html
+            report.html
+          if-no-files-found: warn
+
+      - name: Upload firmware images
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: |
+            ${{ env.APP }}/build/native/zephyr/zephyr.exe
+            ${{ env.APP }}/build/stm32/zephyr/zephyr.elf
+            ${{ env.APP }}/build/stm32/zephyr/zephyr.hex
+            ${{ env.APP }}/build/peer/zephyr/zephyr.elf
