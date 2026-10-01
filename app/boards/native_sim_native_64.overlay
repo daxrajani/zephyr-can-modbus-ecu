@@ -1,0 +1,22 @@
+/*
+ * native_sim: CAN goes to the host SocketCAN interface vcan0 (override at
+ * run time with --can-if), Modbus RTU runs on a second pseudo terminal.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/ {
+	chosen {
+		zephyr,canbus = &can0;
+		ecu,modbus-uart = &uart1;
+	};
+};
+
+&can0 {
+	status = "okay";
+	host-interface = "vcan0";
+};
+
+&uart1 {
+	status = "okay";
+};

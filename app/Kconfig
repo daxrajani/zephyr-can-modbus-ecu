@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: Apache-2.0
+
+mainmenu "Sensor ECU"
+
+config ECU_MODBUS_MIN_FRAME_GAP_US
+	int "Minimum Modbus RTU silent interval (us)"
+	default 0
+	help
+	  Lower bound for the RTU end-of-frame silent interval. On real UARTs
+	  t3.5 is computed from the baud rate. A pseudo terminal delivers
+	  bytes in bursts with host scheduling jitter, so the native_sim
+	  build raises the bound to avoid splitting frames.
+
+source "Kconfig.zephyr"

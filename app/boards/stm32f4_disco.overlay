@@ -1,0 +1,33 @@
+/*
+ * STM32F4 Discovery (also what Renode emulates): CAN1 (PD0/PD1) at
+ * 500 kbit/s, Modbus RTU on USART3 (PD8/PD9), console stays on USART2.
+ *
+ * CAN1 rather than the board default CAN2: CAN1 owns the shared filter
+ * banks, and for the CAN2 slave Renode's STMCAN model numbers the filter
+ * match index across all 28 banks instead of from CAN2SB as silicon does,
+ * so Zephyr would route every received frame to no callback.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/ {
+	chosen {
+		zephyr,canbus = &can1;
+		ecu,modbus-uart = &usart3;
+	};
+};
+
+&can1 {
+	bitrate = <500000>;
+};
+
+&can2 {
+	status = "disabled";
+};
+
+&usart3 {
+	pinctrl-0 = <&usart3_tx_pd8 &usart3_rx_pd9>;
+	pinctrl-names = "default";
+	current-speed = <19200>;
+	status = "okay";
+};

@@ -1,0 +1,24 @@
+# West manifest: this repository is the manifest (T2 "star" topology).
+#
+#   west init -l zephyr-can-modbus-ecu
+#   west update
+#
+# Only the modules the two targets need are fetched.
+
+manifest:
+  self:
+    path: zephyr-can-modbus-ecu
+
+  remotes:
+    - name: zephyrproject-rtos
+      url-base: https://github.com/zephyrproject-rtos
+
+  projects:
+    - name: zephyr
+      remote: zephyrproject-rtos
+      revision: v4.4.2
+      import:
+        name-allowlist:
+          - cmsis
+          - cmsis_6
+          - hal_stm32
